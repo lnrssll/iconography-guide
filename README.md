@@ -63,4 +63,4 @@ docker compose up -d --build
 
 The container runs migrations automatically on startup. The SQLite database is stored in a named Docker volume (`db`).
 
-Env vars are read from `/etc/iconography-guide.env` on the host. See `.env.example` for the required variables. Note that `DATABASE_URL` inside the container should be `sqlite:/app/db/app.db`.
+Env vars are read from `/etc/iconography-guide.env` on the host. Note that `DATABASE_URL` inside the container must be `sqlite:/app/db/app.db` and `PORT` must be `3001`. See `deploy/README.md` for full setup instructions.

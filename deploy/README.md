@@ -1,82 +1,92 @@
 # Deployment
 
-Assumes Ubuntu/Debian on a DigitalOcean droplet with nginx and Node.js installed.
+The app runs in Docker, proxied by nginx with a Let's Encrypt certificate.
+
+## Prerequisites
+
+On the server:
+- Docker + Docker Compose
+- nginx
+- certbot (`sudo apt install certbot python3-certbot-nginx`)
+- The subdomain pointed at the server's IP in DNS (required before certbot will work)
 
 ## First-time setup
 
-### 1. Create a dedicated user and app directory
+### 1. Clone the repo
 
 ```bash
-sudo useradd --system --shell /usr/sbin/nologin --create-home --home-dir /opt/iconography-guide iconography
+git clone <repo-url> /opt/iconography-guide
+cd /opt/iconography-guide
 ```
 
-### 2. Copy the env file
+### 2. Create the env file
 
 ```bash
-sudo cp /path/to/your/.env /etc/iconography-guide.env
+sudo cp .env.example /etc/iconography-guide.env
 sudo chmod 600 /etc/iconography-guide.env
 sudo chown root:root /etc/iconography-guide.env
+sudo nano /etc/iconography-guide.env
 ```
 
-Contents should look like:
+Fill in real values. The `DATABASE_URL` must point to the in-container path:
 
 ```
-DATABASE_URL=sqlite:/opt/iconography-guide/db/app.db
+DATABASE_URL=sqlite:/app/db/app.db
 ADMIN_USERNAME=admin
-ADMIN_PASSWORD=changeme
-SESSION_SECRET=a-long-random-string
-PORT=3000
+ADMIN_PASSWORD=<strong password>
+SESSION_SECRET=<output of: openssl rand -hex 32>
+PORT=3001
 ```
 
-### 3. Deploy the app
+### 3. Start the app
 
 ```bash
-# From your local machine, or run on the server after cloning
-npm ci --omit=dev
-npm run build
-sudo rsync -a --delete dist/ public/ /opt/iconography-guide/
-sudo chown -R iconography:iconography /opt/iconography-guide
+docker compose up -d --build
+docker compose logs -f   # watch for errors
 ```
 
-Or just clone the repo to `/opt/iconography-guide` and build there.
+The container runs database migrations automatically on startup.
 
-### 4. Run database migrations
-
-```bash
-sudo -u iconography bash -c 'cd /opt/iconography-guide && DATABASE_URL=sqlite:./db/app.db npx dbmate up'
-```
-
-### 5. Install and start the systemd service
-
-```bash
-sudo cp deploy/iconography-guide.service /etc/systemd/system/
-sudo systemctl daemon-reload
-sudo systemctl enable --now iconography-guide
-sudo systemctl status iconography-guide
-```
-
-### 6. Configure nginx
+### 4. Configure nginx
 
 ```bash
 sudo cp deploy/nginx-site.conf /etc/nginx/sites-available/iconography-guide
-# Edit the file and replace 'your.domain.com' with your actual domain
 sudo ln -s /etc/nginx/sites-available/iconography-guide /etc/nginx/sites-enabled/
 sudo nginx -t && sudo systemctl reload nginx
 ```
 
-### 7. Get a TLS certificate (Let's Encrypt)
+### 5. Get a TLS certificate
 
 ```bash
-sudo apt install certbot python3-certbot-nginx
-sudo certbot --nginx -d your.domain.com
+sudo certbot --nginx -d icons.lnrssll.com
 ```
 
-Certbot will update the nginx config with the cert paths automatically.
+Certbot updates the nginx config with cert paths automatically and installs a renewal cron job.
 
 ## Redeploying
 
 ```bash
-npm run build
-sudo rsync -a --delete dist/ public/ /opt/iconography-guide/
-sudo systemctl restart iconography-guide
+cd /opt/iconography-guide
+git pull
+docker compose up -d --build
+```
+
+Migrations run automatically on startup, so schema changes are applied as part of the normal redeploy.
+
+## Useful commands
+
+```bash
+docker compose logs -f            # follow logs
+docker compose ps                 # container status
+docker compose down               # stop everything
+docker compose exec app sh        # shell inside the running container
+```
+
+## Backing up the database
+
+The SQLite database lives in a Docker named volume (`db`) and persists across restarts and rebuilds.
+
+```bash
+docker compose exec app sh -c 'sqlite3 /app/db/app.db ".backup /app/db/backup.db"'
+docker cp $(docker compose ps -q app):/app/db/backup.db ./backup.db
 ```
