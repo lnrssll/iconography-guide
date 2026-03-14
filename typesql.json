@@ -1,6 +1,0 @@
-{
-  "databaseUri": "./db/app.db",
-  "sqlDir": "./src/sql",
-  "outDir": "./src/db/queries",
-  "client": "better-sqlite3"
-}

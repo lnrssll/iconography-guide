@@ -1,20 +1,11 @@
 import { Hono } from 'hono'
 import { requireAdmin } from '../../middleware/auth'
-import { db } from '../../db/client'
-import { listSaints } from '../../db/queries/list-saints'
-import { getSaint } from '../../db/queries/get-saint'
-import { insertSaint } from '../../db/queries/insert-saint'
-import { updateSaint } from '../../db/queries/update-saint'
-import { listCurrentSectionsBySaint } from '../../db/queries/list-current-sections-by-saint'
-import { insertSection } from '../../db/queries/insert-section'
-import { markSectionSuperseded } from '../../db/queries/mark-section-superseded'
-import { markSectionDeleted } from '../../db/queries/mark-section-deleted'
-import { listActiveLinksBySaint } from '../../db/queries/list-active-links-by-saint'
-import { insertLink } from '../../db/queries/insert-link'
-import { softDeleteLink } from '../../db/queries/soft-delete-link'
-import { listFeastDaysBySaint } from '../../db/queries/list-feast-days-by-saint'
-import { insertFeastDay } from '../../db/queries/insert-feast-day'
-import { deleteFeastDay } from '../../db/queries/delete-feast-day'
+import {
+  listSaints, getSaint, insertSaint, updateSaint,
+  listCurrentSectionsBySaint, insertSection, markSectionSuperseded, markSectionDeleted,
+  listActiveLinksBySaint, insertLink, softDeleteLink,
+  listFeastDaysBySaint, insertFeastDay, deleteFeastDay,
+} from '../../db/queries'
 
 const app = new Hono()
 
@@ -22,7 +13,7 @@ app.use('*', requireAdmin)
 
 // List saints
 app.get('/', (c) => {
-  const saints = listSaints(db)
+  const saints = listSaints()
   return c.render(
     <main class="max-w-3xl mx-auto px-4 py-10">
       <div class="flex items-center justify-between mb-8">
@@ -87,19 +78,19 @@ app.post('/', async (c) => {
   const birth_date = String(form.get('birth_date') ?? '').trim() || null
   const repose_date = String(form.get('repose_date') ?? '').trim() || null
   if (!name) return c.redirect('/admin/saints/new')
-  const result = insertSaint(db, { name, birth_date, repose_date })
-  return c.redirect(`/admin/saints/${result.lastInsertRowid}`)
+  const id = insertSaint(name, birth_date, repose_date)
+  return c.redirect(`/admin/saints/${id}`)
 })
 
 // Edit saint page
 app.get('/:id', (c) => {
   const id = Number(c.req.param('id'))
-  const saint = getSaint(db, { id })
+  const saint = getSaint(id)
   if (!saint) return c.notFound()
 
-  const sections = listCurrentSectionsBySaint(db, { saint_id: id })
-  const links = listActiveLinksBySaint(db, { saint_id: id })
-  const feastDays = listFeastDaysBySaint(db, { saint_id: id })
+  const sections = listCurrentSectionsBySaint(id)
+  const links = listActiveLinksBySaint(id)
+  const feastDays = listFeastDaysBySaint(id)
 
   return c.render(
     <main class="max-w-3xl mx-auto px-4 py-10 space-y-10">
@@ -233,7 +224,7 @@ app.post('/:id', async (c) => {
   const name = String(form.get('name') ?? '').trim()
   const birth_date = String(form.get('birth_date') ?? '').trim() || null
   const repose_date = String(form.get('repose_date') ?? '').trim() || null
-  if (name) updateSaint(db, { name, birth_date, repose_date }, { id })
+  if (name) updateSaint(id, name, birth_date, repose_date)
   return c.redirect(`/admin/saints/${id}`)
 })
 
@@ -244,14 +235,14 @@ app.post('/:id/feast-days', async (c) => {
   const label = String(form.get('label') ?? '').trim()
   const sort_month = Number(form.get('sort_month')) || null
   const sort_day = Number(form.get('sort_day')) || null
-  if (label) insertFeastDay(db, { saint_id: id, label, sort_month, sort_day })
+  if (label) insertFeastDay(id, label, sort_month, sort_day)
   return c.redirect(`/admin/saints/${id}`)
 })
 
 // Delete feast day
 app.post('/:id/feast-days/:fid/delete', (c) => {
   const fid = Number(c.req.param('fid'))
-  deleteFeastDay(db, { id: fid })
+  deleteFeastDay(fid)
   return c.redirect(`/admin/saints/${c.req.param('id')}`)
 })
 
@@ -262,7 +253,7 @@ app.post('/:id/sections', async (c) => {
   const title = String(form.get('title') ?? '').trim()
   const body = String(form.get('body') ?? '').trim()
   const sort_order = Number(form.get('sort_order')) || 0
-  if (title && body) insertSection(db, { saint_id: id, title, body, sort_order })
+  if (title && body) insertSection(id, title, body, sort_order)
   return c.redirect(`/admin/saints/${id}`)
 })
 
@@ -275,8 +266,8 @@ app.post('/:id/sections/:sid/edit', async (c) => {
   const body = String(form.get('body') ?? '').trim()
   const sort_order = Number(form.get('sort_order')) || 0
   if (title && body) {
-    const result = insertSection(db, { saint_id: id, title, body, sort_order })
-    markSectionSuperseded(db, { superseded_by: result.lastInsertRowid }, { id: sid })
+    const newId = insertSection(id, title, body, sort_order)
+    markSectionSuperseded(sid, newId)
   }
   return c.redirect(`/admin/saints/${id}`)
 })
@@ -284,7 +275,7 @@ app.post('/:id/sections/:sid/edit', async (c) => {
 // Delete section
 app.post('/:id/sections/:sid/delete', (c) => {
   const sid = Number(c.req.param('sid'))
-  markSectionDeleted(db, { id: sid })
+  markSectionDeleted(sid)
   return c.redirect(`/admin/saints/${c.req.param('id')}`)
 })
 
@@ -294,14 +285,14 @@ app.post('/:id/links', async (c) => {
   const form = await c.req.formData()
   const label = String(form.get('label') ?? '').trim()
   const url = String(form.get('url') ?? '').trim()
-  if (label && url) insertLink(db, { saint_id: id, label, url })
+  if (label && url) insertLink(id, label, url)
   return c.redirect(`/admin/saints/${id}`)
 })
 
 // Soft-delete link
 app.post('/:id/links/:lid/delete', (c) => {
   const lid = Number(c.req.param('lid'))
-  softDeleteLink(db, { deleted_at: Math.floor(Date.now() / 1000) }, { id: lid })
+  softDeleteLink(lid)
   return c.redirect(`/admin/saints/${c.req.param('id')}`)
 })
 

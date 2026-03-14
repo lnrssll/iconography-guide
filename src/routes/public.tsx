@@ -1,15 +1,10 @@
 import { Hono } from 'hono'
-import { db } from '../db/client'
-import { listSaints } from '../db/queries/list-saints'
-import { getSaint } from '../db/queries/get-saint'
-import { listCurrentSectionsBySaint } from '../db/queries/list-current-sections-by-saint'
-import { listActiveLinksBySaint } from '../db/queries/list-active-links-by-saint'
-import { listFeastDaysBySaint } from '../db/queries/list-feast-days-by-saint'
+import { listSaints, getSaint, listCurrentSectionsBySaint, listActiveLinksBySaint, listFeastDaysBySaint } from '../db/queries'
 
 const app = new Hono()
 
 app.get('/', (c) => {
-  const saints = listSaints(db)
+  const saints = listSaints()
   return c.render(
     <main class="max-w-2xl mx-auto px-4 py-10">
       <h1 class="text-3xl font-bold mb-2">Iconography Guide</h1>
@@ -30,12 +25,12 @@ app.get('/', (c) => {
 
 app.get('/saints/:id', (c) => {
   const id = Number(c.req.param('id'))
-  const saint = getSaint(db, { id })
+  const saint = getSaint(id)
   if (!saint) return c.notFound()
 
-  const sections = listCurrentSectionsBySaint(db, { saint_id: id })
-  const links = listActiveLinksBySaint(db, { saint_id: id })
-  const feastDays = listFeastDaysBySaint(db, { saint_id: id })
+  const sections = listCurrentSectionsBySaint(id)
+  const links = listActiveLinksBySaint(id)
+  const feastDays = listFeastDaysBySaint(id)
 
   return c.render(
     <main class="max-w-2xl mx-auto px-4 py-10">
