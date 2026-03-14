@@ -6,6 +6,7 @@ import { renderer } from './middleware/renderer'
 import publicRoutes from './routes/public'
 import adminRoutes from './routes/admin/index'
 import loginRoutes from './routes/admin/login'
+import adminSaintsRoutes from './routes/admin/saints'
 
 const app = new Hono()
 
@@ -18,6 +19,7 @@ app.use('*', renderer)
 // Routes
 app.route('/', publicRoutes)
 app.route('/admin/login', loginRoutes)
+app.route('/admin/saints', adminSaintsRoutes)
 app.route('/admin', adminRoutes)
 
 // Dev: Vite handles startup; Prod: start Node server
