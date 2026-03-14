@@ -20,6 +20,7 @@ export default defineConfig(({ mode }) => {
     ],
     build: {
       rollupOptions: {
+        external: ['better-sqlite3'],
         output: {
           banner: `import { fileURLToPath } from 'url';
 import { dirname } from 'path';
